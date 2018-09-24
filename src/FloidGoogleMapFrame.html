@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+    <html>
+      <head>
+        <!-- faigelabs - test code for Floid maps - cfaigle - free -->
+        <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+        <style type="text/css">
+          html { height: 100% }
+          body { height: 100%; margin: 0; padding: 0 }
+          #map_canvas { height: 100% }
+        </style>
+        <script type ="text/javascript"
+                src  ="FloidMapUtilities.js">
+        </script>
+        <script type="text/javascript"
+          src="https://maps.googleapis.com/maps/api/js?sensor=false"><!-- src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&sensor=false"> -->
+        </script>
+        <script type="text/javascript">
+            ///////////////////////////////////////////
+            ///////////////////////////////////////////
+            // Main Initialize - Magic starts here:  //
+            ///////////////////////////////////////////
+            ///////////////////////////////////////////
+            function initialize()
+            {
+                //------------------------------------------------------------------------------------//
+                // We need to keep track of the map listeners so we can turn them on/off in routines  //
+                //------------------------------------------------------------------------------------//
+                var mapDoubleClickListener = null;
+                //----------------------------------//
+                // Create the default map options:  //
+                //----------------------------------//
+                var mapOptions =  {
+                                    center                  : new google.maps.LatLng(latStart, lngStart),
+                                    zoom                    : 12,
+                                    mapTypeId               : google.maps.MapTypeId.ROADMAP,
+                                    disableDoubleClickZoom  : true,
+                                    disableDefaultUI        : true,
+                                    panControl              : true,
+                                    zoomControl             : true,
+                                    mapTypeControl          : true,
+                                    scaleControl            : true,
+                                    streetViewControl       : true,
+                                    overviewMapControl      : true
+                                  };
+                //---------------------------------------//
+                // Create the map and elevator service:  //
+                //---------------------------------------//
+                var map      = new google.maps.Map(document.getElementById("map_canvas"),  mapOptions);
+                var elevator = new google.maps.ElevationService();
+                //----------------------------------------------//
+                // By default we add the double click listener: //
+                //----------------------------------------------//
+                addDoubleClickListener();
+                //-------------------------------------------------------//
+                // Make add and remove map double click event listeners: //
+                //-------------------------------------------------------//
+                function addDoubleClickListener()
+                {
+                    if(mapDoubleClickListener != null)
+                    {
+                        log("addDoubleClickListener: mapDoubleClickListener was not null on mapId: " + mapId);
+                        mapDoubleClickListener = null;
+                    }
+                    try
+                    {
+                        mapDoubleClickListener = google.maps.event.addListener( map,
+                                                                                'dblclick',
+                                                                                function(event)
+                                                                                {
+                                                                                    mapDoubleClick(event.latLng);
+                                                                                    event.stop();
+                                                                                });
+                    }
+                    catch(err)
+                    {
+                        log("addDoubleClickListener: " + err);
+                    }
+                }
+                function removeDoubleClickListener()
+                {
+                    if(mapDoubleClickListener!=null)
+                    {
+                        try
+                        {
+                            google.maps.event.removeListener(mapDoubleClickListener);
+                        }
+                        catch(err)
+                        {
+                            log("removeDoubleClickListener: " + err);
+                        }
+                        mapDoubleClickListener = null;
+                    }
+                    else
+                    {
+                        log("removeDoubleClickListener: mapDoubleClickListener was already null on mapId: " + mapId);
+                    }
+                }            
+                //------------------------------------------//
+                // Create handlers for map double click:    //
+                //------------------------------------------//
+                // mapDoubleClick:
+                function mapDoubleClick(latLng)
+                {
+                    log("mapDoubleClick: " + latLng);
+                    log("calling flash routine: " + "googleMapsDoubleClick_" + mapId);
+                    swfObject["floidMapDoubleClick_" + mapId](latLng.lat(), latLng.lng());
+                }
+                //********************************//
+                //********************************//
+                // Calls from Flash to the map:   //
+                //********************************//
+                //********************************//
+                ////////////////////////////////////////////////
+                // Function creators for flash calls to map:  //
+                ////////////////////////////////////////////////
+                // -------------------------------
+                // floidGoogleMapsCreateNewMarker:
+                // -------------------------------
+                function makeFloidGoogleMapsCreateNewMarkerFunction()
+                {
+                    return function(lat, lng, markerId)
+                    {
+                        log("floidGoogleMapsCreateNewMarker: " + lat + " " + lng + " " + markerId);
+                        createNewMarker(new google.maps.LatLng(lat, lng, true), markerId);
+                    } 
+                }
+                // -----------------------------
+                // floidGoogleMapsCreateNewLine:
+                // -----------------------------
+                function makeFloidGoogleMapsCreateNewLineFunction()
+                {
+                    return function(lineId, startLat, startLng, endLat, endLng, a, r, g, b, w)
+                    {
+                        log("floidGoogleMapsCreateNewLine: " + startLat + " " + startLng + " " + endLat + " " + endLng + " " + a + " " + r + " " + g + " " + b);
+                        createNewLine(lineId, startLat, startLng, endLat, endLng, a, r, g, b, w);
+                    }
+                }
+                // --------------------------------------
+                // floidGoogleMapsAddDoubleClickListener:
+                // --------------------------------------
+                function makeFloidGoogleMapsAddDoubleClickListenerFunction()
+                {
+                    return function(mapId)
+                    {
+                        log("floidGoogleMapsAddDoubleClickListener: " + mapId);
+                        addDoubleClickListener();
+                    } 
+                }
+                // -----------------------------------------
+                // floidGoogleMapsRemoveDoubleClickListener:
+                // -----------------------------------------
+                function makeFloidGoogleMapsRemoveDoubleClickListenerFunction()
+                {
+                    return function(mapId)
+                    {
+                        log("floidGoogleMapsRemoveDoubleClickListener: " + mapId);
+                        removeDoubleClickListener();
+                    } 
+                }
+                // ----------------------------------
+                // floidGoogleMapsGetPathMaxElevation:
+                // ----------------------------------
+                function makeFloidGoogleMapsGetPathMaxElevationFunction()
+                {
+                    return function(lineId, startLat, startLng, endLat, endLng, maxMarkers, requestedPathDistanceInMeters, errorElevation, warningElevation, actualMarkers, actualPathDistanceInMeters)
+                    {
+                        log("floidGoogleMapsGetPathMaxElevation: " + startLat + " " + startLng + " " + endLat + " " + endLng + " " + maxMarkers + " " + requestedPathDistanceInMeters + " " + errorElevation + " " + warningElevation + " " + actualMarkers + " " + actualPathDistanceInMeters);
+                        getPathMaxElevation(lineId, startLat, startLng, endLat, endLng, maxMarkers, requestedPathDistanceInMeters, errorElevation, warningElevation, actualMarkers, actualPathDistanceInMeters);
+                    } 
+                }
+                //////////////////////////////////////////////////////////////////////////////
+                // Make a set of function creation routines for the flash calls to the DOM: //
+                //////////////////////////////////////////////////////////////////////////////
+                // -------------------------------
+                // floidGoogleMapsCreateNewMarker:
+                // -------------------------------
+                var floidGoogleMapsCreateNewMarkerFunctionName                       = "floidMapCreateNewMarker_" + mapId;
+                this.parent[floidGoogleMapsCreateNewMarkerFunctionName]              = makeFloidGoogleMapsCreateNewMarkerFunction();
+                // -----------------------------
+                // floidGoogleMapsCreateNewLine:
+                // -----------------------------
+                var floidGoogleMapsCreateNewLineFunctionName                         = "floidMapCreateNewLine_" + mapId;
+                this.parent[floidGoogleMapsCreateNewLineFunctionName]                = makeFloidGoogleMapsCreateNewLineFunction();
+                // --------------------------------------
+                // floidGoogleMapsAddDoubleClickListener:
+                // --------------------------------------
+                var floidGoogleMapsAddDoubleClickListenerFunctionName                = "floidMapAddDoubleClickListener_" + mapId;
+                this.parent[floidGoogleMapsAddDoubleClickListenerFunctionName]       = makeFloidGoogleMapsAddDoubleClickListenerFunction();
+                // -----------------------------------------
+                // floidGoogleMapsRemoveDoubleClickListener:
+                // -----------------------------------------
+                var floidGoogleMapsRemoveDoubleClickListenerFunctionName             = "floidMapRemoveDoubleClickListener_" + mapId;
+                this.parent[floidGoogleMapsRemoveDoubleClickListenerFunctionName]    = makeFloidGoogleMapsRemoveDoubleClickListenerFunction();
+                // --------------------------------
+                // floidGoogleMapsGetPathMaxElevation:
+                // --------------------------------
+                var floidGoogleMapsGetPathMaxElevationFunctionName                   = "floidMapGetPathMaxElevation_" + mapId;
+                this.parent[floidGoogleMapsGetPathMaxElevationFunctionName]          = makeFloidGoogleMapsGetPathMaxElevationFunction();
+                /////////////////////////////
+                // Map routines:           //
+                /////////////////////////////
+                // ----- MARKERS -----
+                // ----------------
+                // createNewMarker:
+                // ----------------
+                function createNewMarker(latLng, markerId)
+                {
+                    log("Making new marker [" + mapId + "] ("+latLng.lat + ", " + latLng.lng + ")");
+                    var marker = new google.maps.Marker({
+                                                            position:        latLng,
+                                                            map:             map,
+                                                            radius:          12,
+                                                            hasShadow:       true,
+                                                            clickable:       true,
+                                                            draggable:       true,
+                                                            gravity:         0.5,
+                                                            distanceScaling: false
+                                                        });
+                    ////////////////////////////////////////////////
+                    // Marker listeners that call back to flash:  //
+                    ////////////////////////////////////////////////
+                    // ------------------------------------------------------
+                    // OK, here we want to add the listeners for this marker:
+                    // ------------------------------------------------------
+                    google.maps.event.addListener(  marker,
+                                                    'dblclick',
+                                                    function()
+                                                    { 
+                                                        swfObject["floidMapMarkerDoubleClick_" + mapId+"_"+markerId](markerId);            
+                                                    });
+                    google.maps.event.addListener(  marker,
+                                                    'dragstart',
+                                                    function(event)
+                                                    { 
+                                                        swfObject["floidMapMarkerDragStart_" + mapId+"_"+markerId](markerId, event.latLng.lat(), event.latLng.lng());
+                                                    });
+                    google.maps.event.addListener(  marker,
+                                                    'dragend',
+                                                    function(event)
+                                                    {
+                                                        swfObject["floidMapMarkerDragEnd_" + mapId+"_"+markerId](markerId, event.latLng.lat(), event.latLng.lng());
+                                                    });
+                    google.maps.event.addListener(  marker,
+                                                    'drag',
+                                                    function(event)
+                                                    {
+                                                        swfObject["floidMapMarkerDrag_" + mapId+"_"+markerId](markerId, event.latLng.lat(), event.latLng.lng());
+                                                    });
+                    //***********************************//
+                    //***********************************//
+                    // Calls from Flash to the marker:   //
+                    //***********************************//
+                    //***********************************//
+                    ///////////////////////////////////////////////////
+                    // Function creators for flash calls to marker:    //
+                    ///////////////////////////////////////////////////
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetClickable: [function creator]
+                    // -----------------------------------------------------
+                    function makeFloidGoogleMapsMarkerSetClickableFunction(marker, markerId)
+                    {
+                        return function(clickable)
+                        {
+                                log("floidGoogleMapsMarkerSettingClickable: " + markerId + "  to " + clickable);
+                                marker.setClickable(clickable);
+                        }
+                    }
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetDraggable: [function creator]
+                    // -----------------------------------------------------
+                    function makeFloidGoogleMapsMarkerSetDraggableFunction(marker, markerId)
+                    {
+                        return function(draggable)
+                        {
+                                log("floidGoogleMapsMarkerSettingDraggable: " + markerId + "  to " + draggable);
+                                marker.setDraggable(draggable);
+                        }
+                    }
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetIconString: [function creator]
+                    // -----------------------------------------------------
+                    function makeFloidGoogleMapsMarkerSetIconStringFunction(marker, markerId)
+                    {
+                        return function(iconString)
+                        {
+                                log("floidGoogleMapsMarkerSetIconString: " + markerId);
+                                log("marker icon string: " + iconString);
+    
+                                var markerIcon = {url:   'data:image/png;base64,'+iconString,
+                                                  size:   new google.maps.Size(100, 38),
+                                                  origin: new google.maps.Point(0, 0),
+                                                  anchor: new google.maps.Point(0, 38)};
+    
+    
+                                log("floidGoogleMapsMarkerSetIconString: " + markerId + " - markerIconMade");
+                                marker.setIcon(markerIcon);
+                                log("floidGoogleMapsMarkerSetIconString: " + markerId + " - markerIconSet");
+                        }
+                    }
+                    // ------------------------------------------------------------
+                    // floidGoogleMapsMarkerSetIconShadowString: [function creator]
+                    // ------------------------------------------------------------
+                    function makeFloidGoogleMapsMarkerSetIconShadowStringFunction(marker, markerId)
+                    {
+                        return function(iconShadowString)
+                        {
+                                log("floidGoogleMapsMarkerSetIconShadowString: " + markerId);
+                                log("marker shadow string: " + iconShadowString);
+    
+                                var markerIconShadow = {url:   'data:image/png;base64,'+iconShadowString,
+                                                        size:   new google.maps.Size(132, 20),
+                                                        origin: new google.maps.Point(0, 0),
+                                                        anchor: new google.maps.Point(0, 16)};
+                                log("floidGoogleMapsMarkerSetIconString: " + markerId + " - markerIconShadowMade");
+                                marker.setShadow(markerIconShadow);
+                                log("floidGoogleMapsMarkerSetIconString: " + markerId + " - markerIconShadowSet");
+                        }
+                       }
+                    // ---------------------------------------------------------
+                    // floidGoogleMapsMarkerRequestElevation: [function creator]
+                    // ---------------------------------------------------------
+                    function makeFloidGoogleMapsMarkerRequestElevationFunction(marker, markerId)
+                    {
+                        return function(markerId, lat, lng)
+                        {
+                            log("floidGoogleMapsMarkerRequestElevation: " + markerId + " - Requesting Elevation for: " + lat + " " + lng);
+                            // Locations parameter:
+                            var latLng = new google.maps.LatLng(lat, lng);
+                            var locations = [];
+                            locations.push(latLng);
+                            // Create a LocationElevationRequest object using the array's one value
+                            var positionalRequest = {
+                                                        'locations': locations
+                                                    };
+                            // Initiate the location request
+                            elevator.getElevationForLocations(positionalRequest,
+                                                              function(results, status)
+                                                              {
+                                                                  log("got elevation result");
+                                                                  if (status == google.maps.ElevationStatus.OK)
+                                                                  {
+                                                                      log("got ok elevation result");
+                                                                      // Retrieve the first result
+                                                                      if (results[0])
+                                                                      {
+                                                                          log("results[0] was good: " + results[0].elevation);
+                                                                          // call back into flash :)
+                                                                          swfObject["floidMapMarkerElevationResult_" + mapId+"_"+markerId](markerId, results[0].elevation);
+                                                                      }                                                                  
+                                                                      else
+                                                                      {
+                                                                          log("No results found");
+                                                                      }
+                                                                  }
+                                                                  else
+                                                                  {
+                                                                    log("Elevation service failed due to: " + status);
+                                                                  }
+                                                              });
+                            log("floidGoogleMapsMarkerRequestElevation: " + markerId + " - Elevation Requested");
+                        }
+                    }
+                    // -----------------------------------------------
+                    // floidGoogleMapsRemoveMarker: [function creator]
+                    // -----------------------------------------------
+                    function makeFloidGoogleMapsRemoveMarkerFunction(marker, markerId)
+                    {
+                        return function()
+                        {
+                            log("Removing marker.");
+                            log("floidGoogleMapsRemoveMarker: " + mapId + " "  + markerId);
+                            try
+                            {
+                                // Remove the marker:
+                                marker.setMap(null);
+                                marker = null;
+                                // Remove the globally bound functions:
+                                delete this.parent[floidGoogleMapsMarkerSetClickableFunctionName];
+                                delete this.parent[floidGoogleMapsMarkerSetDraggableFunctionName];
+                                delete this.parent[floidGoogleMapsMarkerRequestElevationFunctionName];
+                                delete this.parent[floidGoogleMapsMarkerSetIconStringFunctionName];
+                                delete this.parent[floidGoogleMapsMarkerSetIconShadowStringFunctionName];
+                                // Don't forget me!
+                                delete this.parent[floidGoogleMapsRemoveMarkerFunctionName];
+                            }
+                            catch(err)
+                            {
+                                log("floidGoogleMapsRemoveMarker: error " + err);
+                                log("floidGoogleMapsRemoveMarker: error " + mapId + " "  + markerId + " " + err);
+                            }
+                            log("Done removing marker.");
+                        }
+                    }
+                    ///////////////////////////////////////////////////////
+                    // Add the flash calls for this marker to the DOM:   //
+                    ///////////////////////////////////////////////////////    
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetClickable:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsMarkerSetClickableFunctionName                 = "floidMapMarkerSetClickable_" + mapId + "_" + markerId;
+                    this.parent[floidGoogleMapsMarkerSetClickableFunctionName]        = makeFloidGoogleMapsMarkerSetClickableFunction(marker, markerId);    
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetDraggable:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsMarkerSetDraggableFunctionName                 = "floidMapMarkerSetDraggable_" + mapId + "_" + markerId;
+                    this.parent[floidGoogleMapsMarkerSetDraggableFunctionName]        = makeFloidGoogleMapsMarkerSetDraggableFunction(marker, markerId);
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerRequestElevation:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsMarkerRequestElevationFunctionName             = "floidMapMarkerRequestElevation_" + mapId + "_" + markerId;
+                    this.parent[floidGoogleMapsMarkerRequestElevationFunctionName]    = makeFloidGoogleMapsMarkerRequestElevationFunction(marker, markerId);
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetIconString:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsMarkerSetIconStringFunctionName                = "floidMapMarkerSetIconString_" + mapId + "_" + markerId;
+                    this.parent[floidGoogleMapsMarkerSetIconStringFunctionName]       = makeFloidGoogleMapsMarkerSetIconStringFunction(marker, markerId);
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMarkerSetIconShadowString:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsMarkerSetIconShadowStringFunctionName          = "floidMapMarkerSetIconShadowString_" + mapId + "_" + markerId;
+                    this.parent[floidGoogleMapsMarkerSetIconShadowStringFunctionName] = makeFloidGoogleMapsMarkerSetIconShadowStringFunction(marker, markerId);
+                    // ----------------------------
+                    // floidGoogleMapsRemoveMarker:
+                    // ----------------------------
+                    var floidGoogleMapsRemoveMarkerFunctionName                       = "floidMapRemoveMarker_" + mapId + "_" + markerId;
+                    this.parent[floidGoogleMapsRemoveMarkerFunctionName]              = makeFloidGoogleMapsRemoveMarkerFunction(marker, markerId);
+                }
+                // ----- LINES -----
+                // --------------
+                // createNewLine:
+                // --------------
+                function createNewLine(lineId, startLat, startLng, endLat, endLng, a, r, g, b, w)
+                {
+                    var lineCoordinates = [
+                                            new google.maps.LatLng(startLat, startLng),
+                                            new google.maps.LatLng(endLat,   endLng)
+                                          ];
+                    var strokeOpacity   = a / 255.0;
+                    var strokeColor     = rgbToHex(r, g, b);
+                    var line            = new google.maps.Polyline( {
+                                                                       path:          lineCoordinates,
+                                                                       strokeOpacity: strokeOpacity,
+                                                                       strokeColor:   strokeColor,
+                                                                       clickable:     false,
+                                                                       editable:      false,
+                                                                       geodesic:      true,
+                                                                       map:           map
+                                                                     }
+                                                                   );    
+                    //////////////////////////////////////////////
+                    // Line listeners that call back to flash:  //
+                    //////////////////////////////////////////////
+                    // ----------------------------------------------------
+                    // OK, here we want to add the listeners for this line:
+                    // ----------------------------------------------------
+                    // Default is no listeners for this line:
+    
+                    //***********************************//
+                    //***********************************//
+                    // Calls from Flash to the line:   //
+                    //***********************************//
+                    //***********************************//
+                    /////////////////////////////////////////////////
+                    // Function creators for flash calls to line:  //
+                    /////////////////////////////////////////////////
+                    // -----------------------------------------------
+                    // floidGoogleMapsRemoveLine: [function creator]
+                    // -----------------------------------------------
+                    function makeFloidGoogleMapsRemoveLineFunction(line, lineId)
+                    {
+                        return function()
+                        {
+                            log("Removing line.");
+                            try
+                            {
+                                // Remove the line:
+                                line.setMap(null);
+                                // Remove the globally bound functions:
+                                // - empty
+                                // Don't forget me!
+                                delete this.parent[floidGoogleMapsRemoveLineFunctionName];
+                            }
+                            catch(err)
+                            {
+                                log("floidGoogleMapsRemoveMarker: error " + err);
+                            }
+                            log("Done removing line.");
+                        }
+                    }
+                    // -----------------------------------------------
+                    // floidGoogleMapsSetLineColor: [function creator]
+                    // -----------------------------------------------
+                    function makeFloidGoogleMapsSetLineColorFunction(line, lineId)
+                    {
+                        return function(a, r, g, b, w)
+                        {
+                            var newOpacity  = a/255.0;
+                            var newColor    = rgbToHex(r, g, b); 
+                            log("Changing line color to: " + newColor);
+                            try
+                            {
+                                line.setOptions({strokeColor: newColor, strokeOpacity: newOpacity, strokeWeight: w});
+                            }
+                            catch(err)
+                            {
+                                log("floidGoogleMapsSetLineColor: error " + err);
+                            }
+                            log("Done setting line color.");
+                        }
+                    }
+                    // -------------------------------------------
+                    // floidGoogleMapsMoveLine: [function creator]
+                    // -------------------------------------------
+                    function makeFloidGoogleMapsMoveLineFunction(line, lineId)
+                    {
+                        return function(startLat, startLng, endLat, endLng)
+                        {
+                            log("Moving line [" + lineId + "] to: " + startLat + " " + startLng + " -> " + endLat + " " + endLng);
+                            try
+                            {
+                                var lineCoordinates = [
+                                                        new google.maps.LatLng(startLat, startLng),
+                                                        new google.maps.LatLng(endLat,   endLng)
+                                                      ];
+                                line.setPath(lineCoordinates);
+                            }
+                            catch(err)
+                            {
+                                log("floidGoogleMapsMoveLine: error " + err);
+                            }
+                            log("Done moving line.");
+                        }
+                    }
+                    /////////////////////////////////////////////////////
+                    // Add the flash calls for this line to the DOM:   //
+                    /////////////////////////////////////////////////////
+                    // -----------------------------------------------------
+                    // floidGoogleMapsRemoveLineFunction:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsRemoveLineFunctionName                    = "floidMapRemoveLine_" + mapId + "_" + lineId;
+                    this.parent[floidGoogleMapsRemoveLineFunctionName]           = makeFloidGoogleMapsRemoveLineFunction(line, lineId);    
+                    // -----------------------------------------------------
+                    // floidGoogleMapsSetLineColorFunction:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsSetLineColorFunctionName                  = "floidMapSetLineColor_" + mapId + "_" + lineId;
+                    this.parent[floidGoogleMapsSetLineColorFunctionName]         = makeFloidGoogleMapsSetLineColorFunction(line, lineId);
+                    // -----------------------------------------------------
+                    // floidGoogleMapsMoveLineFunction:
+                    // -----------------------------------------------------
+                    var floidGoogleMapsMoveLineFunctionName                      = "floidMapMoveLine__" + mapId + "_" + lineId;
+                    this.parent[floidGoogleMapsMoveLineFunctionName]             = makeFloidGoogleMapsMoveLineFunction(line, lineId);    
+                }
+                // ------ Paths -------
+                // --------------------
+                // getPathMaxElevation:
+                // --------------------
+                function getPathMaxElevation(lineId, startLat, startLng, endLat, endLng, maxSamples, requestedPathDistanceInMeters, errorElevation, warningElevation, actualSamples, actualPathDistanceInMeters)
+                {
+                    var sampleLocations = calculateSamples(startLat, startLng, endLat, endLng, actualSamples);
+                    // OK, make an array of sample points to test:
+                    var samplePositions = [];
+                    for(var i=0; i<sampleLocations.length/2; ++i)
+                    {
+                        var sampleLatLng = new google.maps.LatLng(sampleLocations[i*2], sampleLocations[i*2+1]);
+                        samplePositions.push(sampleLatLng);
+                    }
+                    //  Then make a request to google maps:
+                    var positionalRequest = {
+                                              'locations': samplePositions
+                                            };
+                    // Send the location request:
+                    elevator.getElevationForLocations(positionalRequest,
+                                                      function(results, status)
+                                                      {
+                                                          // Note this is in meters:
+                                                          log("got path max elevation results");
+                                                          var maxElevation = -100000;  // Min value
+                                                          var errorFlag    = true;
+                                                          if (status == google.maps.ElevationStatus.OK)
+                                                          {
+                                                              log("got ok path max elevation results");
+                                                              // Retrieve the first result
+                                                              if (results[0])
+                                                              {
+                                                                  log("getPathMaxElevation results[0] was good: " + results[0].elevation);
+                                                                  maxElevation = results[0].elevation;
+                                                                  for(var e=0; e<results.length; ++e)
+                                                                  {
+                                                                      log("elevation: " + results[e].elevation);
+                                                                      if(results[e].elevation>maxElevation)
+                                                                      {
+                                                                          maxElevation = results[e].elevation
+                                                                      }
+                                                                  }
+                                                                  errorFlag = false;
+                                                              }
+                                                              else
+                                                              {
+                                                                  log("getPathMaxElevation: No results found");
+                                                              }
+                                                          }
+                                                          else
+                                                          {
+                                                              log("getPathMaxElevation: Service failed due to: " + status);
+                                                          }
+                                                          // call back into flash :)
+                                                          swfObject["floidMapPathMaxElevationCallBack_" + mapId](lineId, startLat, startLng, endLat, endLng, maxSamples, requestedPathDistanceInMeters, errorElevation, warningElevation, maxElevation, actualSamples, actualPathDistanceInMeters, errorFlag);
+                                                      });
+                    log("getMaxPathElevation: " + lineId + " - Elevation Requested");
+                }            
+                // OK, the map is fully initialized - call back into flash:
+                swfObject["floidMapInitialized_" + mapId]();
+            }
+            function finalize()
+            {
+                // Remove global map functions - TODO: remove remaining marker & line functions
+                try
+                {
+                    delete this.parent[floidGoogleMapsCreateNewMarkerFunctionName];
+                    delete this.parent[floidGoogleMapsCreateNewLineFunctionName];
+                    delete this.parent[floidGoogleMapsAddDoubleClickListenerFunctionName];
+                    delete this.parent[floidGoogleMapsRemoveDoubleClickListenerFunctionName];
+                    delete this.parent[floidGoogleMapsGetPathMaxElevationFunctionName];
+                }
+                catch(err)
+                {
+                    log("Removing map methods error: " + err);
+                }
+                if(swfObject != null)
+                {
+                    // call back into flash :)
+                    swfObject["floidMapFrameUnloaded_" + mapId]();
+                }
+            }
+        </script>
+      </head>
+      <body onload="initialize()" onunload="finalize()">
+        <div id="map_canvas" style="width:100%; height:100%"></div>
+      </body>
+    </html>

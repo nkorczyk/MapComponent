@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- faigelabs - test code for Floid maps - cfaigle - free -->
+<s:Group xmlns:fx         = "http://ns.adobe.com/mxml/2009" 
+	xmlns:s          = "library://ns.adobe.com/flex/spark" 
+	xmlns:mx         = "library://ns.adobe.com/flex/mx"
+	width            = "400"
+	height           = "400"
+	creationComplete = "creationCompleteHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import com.faiglelabs.floid.testcode.FloidPinAlt;
+			import com.google.code.flexiframe.IFrame;
+			
+			import mx.events.FlexEvent;
+			public    var applicationName        : String       = "TestFloidJavaScriptMaps";  // The name to pass to the html frame to find the swf object
+			public    var mapId                  : int          = 0;
+			public    var mapType                : String       = "NONE";        // No support for abstract classes in AS3
+			public    var latStart               : Number       = 39.885522;     // Flat low area in ocean by Mallorca near mountains - decimal degrees
+			public    var lngStart               : Number       =  3.096644;     //  for line elevation color testing
+			protected var floidMapFlexIFrame     : IFrame       = null;
+			protected var nextMarkerId           : int          = 1;
+			protected var nextLineId             : int          = 1;
+			protected var currentMarkers         : Object       = new Object();  // This holds a reference by markerId to its pin
+			protected var currentLines           : Object       = new Object();  // This just holds a reference to its own lineId
+			public    var testMaxMarkers         : int          = 50;            // We do not want to flood the elevation service
+			// Note: Bing says 1024 max here: http://msdn.microsoft.com/en-us/library/jj158961.aspx
+			//   but seems to stop responding with even less than this 50 total
+			public    var testRequestedDistance  : int          = 400;           // We would like them spaced 400 meters apart = 20km total
+			public    var testErrorElevation     : Number       = 500;           // In meters - above or equal is error
+			public    var testWarningElevation   : Number       = 300;           // In meters - below this is ok, otherwise warning
+			// Component is created:
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				// Put stuff here you want to do when the component is initialized...
+				trace("FloidMap Component initialized: ["  + mapType + "]=" + mapId);
+				// First, add our callbacks to the DOM now that we know our mapId and before the map is created:
+				ExternalInterface.addCallback("floidMapInitialized_"              + mapId, floidMapInitialized);
+				ExternalInterface.addCallback("floidMapFrameUnloaded_"            + mapId, floidMapFrameUnloaded);
+				ExternalInterface.addCallback("floidMapDoubleClick_"              + mapId, floidMapDoubleClick);
+				ExternalInterface.addCallback("floidMapPathMaxElevationCallBack_" + mapId, floidMapPathMaxElevationCallBack);            
+				// Create the IFrame that loads the maps html:
+				floidMapFlexIFrame                  = new IFrame("floidMapFrame_" + mapId);
+				floidMapFlexIFrame.percentHeight    = 100;
+				floidMapFlexIFrame.percentWidth     = 100;
+				floidMapFlexIFrame.source           = "Floid"+mapType+"MapFrame.html?mapId=" + mapId + "&obj="+applicationName+"&latStart="+latStart+"&lngStart="+lngStart;
+				floidMapFlexIFrame.overlayDetection = true;
+				floidMapFlexIFrame.scrollPolicy     = IFrame.SCROLL_POLICY_OFF;
+				floidMapFlexIFrame.addEventListener("frameLoad", floidMapFrameLoad);
+				this.addElement(floidMapFlexIFrame);
+				trace("FloidMap Component initialized: ["  + mapType + "]=" + mapId + " completed.");
+			}
+			// Distance functions:
+			// -------------------
+			protected var rad :Object = function(x:*):Number {return x*Math.PI/180;}
+			// Meters:
+			protected  function distanceHaversine(startLat:Number, startLng:Number, endLat:Number, endLng:Number):Number
+			{
+				var R     : int    = 6371; // earth's mean radius in km
+				var dLat  : Number = rad(endLat - startLat);
+				var dLong : Number = rad(endLng - startLng);
+				var a     : Number = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(rad(startLat)) * Math.cos(rad(endLat)) * Math.sin(dLong/2) * Math.sin(dLong/2);
+				var c     : Number = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+				var d     : Number = R * c;
+				return d*1000;  // km to m
+			}
+			// Map functions & callbacks:
+			// --------------------------
+			protected function floidMapInitialized():void
+			{
+				// Put stuff here you want to do when the map is initialized...
+				trace("FloidMap initialized: ["  + mapType + "]=" + mapId);
+			}
+			protected function floidMapFrameLoad(event:Event):void
+			{
+				// Put stuff here you want to do when the frame is loaded
+				trace("FloidMap frame loaded: ["  + mapType + "]=" + mapId);
+			}
+			protected function floidMapFrameUnloaded():void
+			{
+				// Put stuff here you want to do when the underlying frame receives an unload
+				trace("map frame unloaded: " + mapId);
+			}
+			protected function floidMapDoubleClick(lat:Number, lng:Number):void
+			{
+				trace("floidmapDoubleClick: " + mapId + " lat: " + lat + "  lng: " + lng);
+				var markerId : Number = nextMarkerId++;
+				trace("create new map marker: " + markerId);
+				trace("calling external interface: floidMapCreateNewMarker_" + mapId + " lat: " + lat + "  lng: " + lng);
+				ExternalInterface.call("floidMapCreateNewMarker_" + mapId, lat, lng, markerId);
+				// Add callback handlers for this marker:
+				ExternalInterface.addCallback("floidMapMarkerDoubleClick_"     + mapId + "_" + markerId, floidMapMarkerDoubleClick);
+				ExternalInterface.addCallback("floidMapMarkerDragStart_"       + mapId + "_" + markerId, floidMapMarkerDragStart);
+				ExternalInterface.addCallback("floidMapMarkerDragEnd_"         + mapId + "_" + markerId, floidMapMarkerDragEnd);
+				ExternalInterface.addCallback("floidMapMarkerDrag_"            + mapId + "_" + markerId, floidMapMarkerDrag);
+				ExternalInterface.addCallback("floidMapMarkerElevationResult_" + mapId + "_" + markerId, floidMapMarkerElevationResult);
+				// The rest of ths routine is test code:
+				// =====================================
+				// Make a test call to create a marker icon for this:
+				var floidPinAlt : FloidPinAlt = new FloidPinAlt();
+				floidPinAlt.pinName = "Floid-"+mapId+"-"+markerId;
+				currentMarkers[markerId] = floidPinAlt;
+				var floidPinMarkerIconBase64String : String = floidPinAlt.makeIcon();
+				trace("Setting marker icon: " + mapId + " " + markerId);
+				trace("marker string: " + floidPinMarkerIconBase64String);
+				ExternalInterface.call("floidMapMarkerSetIconString_" + mapId + "_" + markerId, floidPinMarkerIconBase64String);
+				var floidPinMarkerIconShadowBase64String : String = floidPinAlt.makeIconShadow();
+				trace("Setting marker shadow: " + mapId + " " + markerId);
+				trace("marker shadow string: " + floidPinMarkerIconShadowBase64String);
+				ExternalInterface.call("floidMapMarkerSetIconShadowString_" + mapId + "_" + markerId, floidPinMarkerIconShadowBase64String);            
+				// TEST CODE BELOW - remove previous marker - so we only have one on map at a time
+				if(markerId >1)
+				{
+					trace("Removing previous marker: " + (markerId-1));
+					var removePreviousMarkerCallName : String = "floidMapRemoveMarker_" + mapId + "_" + (markerId-1);
+					ExternalInterface.call(removePreviousMarkerCallName);
+					// Remove the marker from our associative array:
+					delete currentMarkers[markerId-1];
+				}
+				// TEST CODE BELOW - add a line from latStart, lngStart to this point:
+				var lineId : Number = nextLineId++;
+				trace("create new map line: " + lineId);
+				ExternalInterface.call("floidMapCreateNewLine_" + mapId, lineId, latStart, lngStart, lat, lng, 255, 0, 0, 0, 2);  // Opaque Black 2 px line
+				currentLines[lineId] = lineId;
+				// TEST CODE BELOW - change the line to blue:
+				trace("Setting line color to blue:" + lineId);
+				ExternalInterface.call("floidMapSetLineColor_" + mapId + "_" + lineId, 255, 0, 0, 255, 2);
+				// TEST CODE BELOW - check the line to see if its height is ok
+				trace("Checking maxPathElevation:" + lineId);
+				floidMapGetPathMaxElevation(lineId, latStart, lngStart, lat, lng, testMaxMarkers, testRequestedDistance, testErrorElevation, testWarningElevation);
+				// TEST CODE BELOW - remove previous line
+				if(lineId >1)
+				{
+					trace("Removing previous line: " + (lineId-1));
+					var removePreviousLineCallName : String = "floidMapRemoveLine_" + mapId + "_" + (lineId-1);
+					ExternalInterface.call(removePreviousLineCallName);
+					// Remove the line from our associative array:
+					delete currentLines[lineId-1];
+				}
+				// TEST CODE BELOW - get the elevation for the pin:
+				trace("Call back and requesting Elevation: " + mapId + " " + markerId + " " + lat + " " + lng);
+				ExternalInterface.call("floidMapMarkerRequestElevation_" + mapId + "_" + markerId, markerId, lat, lng);
+			}
+			// Marker double click:
+			protected function floidMapMarkerDoubleClick(markerId:Number):void
+			{
+				trace("floidMapMarkerDoubleClick: " + markerId);
+				// TEST CODE BELOW - RETURN THE MAP TO ACCEPTING DOUBLE CLICKS AFTER DOUBLE CLICKING ANY MARKER:
+				trace("Turn the map to accept double clicks after double clicking any marker: " + mapId);
+				ExternalInterface.call("floidMapAddDoubleClickListener_" + mapId, mapId);
+			}
+			// Marker drag start:
+			protected function floidMapMarkerDragStart(markerId:Number, lat:Number, lng:Number):void
+			{
+				trace("floidMapMarkerDragStart: " + markerId + " " + lat + " " + lng);
+			}
+			// Marker drag end:
+			protected function floidMapMarkerDragEnd(markerId:Number, lat:Number, lng:Number):void
+			{
+				trace("floidMapMarkerDragEnd: " + markerId + " " + lat + " " + lng);
+				// TEST CODE BELOW:
+				trace("Call back and requesting Elevation: " + mapId + " " + markerId + " " + lat + " " + lng);
+				ExternalInterface.call("floidMapMarkerRequestElevation_" + mapId + "_" + markerId, markerId, lat, lng);
+				
+				// Choose only one of the following two tests or you won't be able to click marker to reset map to accepting double clicks:
+				//            // TEST CODE BELOW - TURN THE MARKER TO NOT CLICKABLE AFTER DRAGGING:
+				//            trace("Turn the marker to not clickable after dragging: " + mapId);
+				//            ExternalInterface.call("floidMapMarkerSetClickable_" + mapId + "_" + markerId, false);            
+				
+				// This is the other one:
+				// TEST CODE BELOW - TURN THE MAP TO NOT ACCEPT DOUBLE CLICKS AFTER DRAGGING:
+				trace("Turn the map to not accept double clicks after dragging: " + mapId);
+				ExternalInterface.call("floidMapRemoveDoubleClickListener_" + mapId, mapId);
+				
+				// TEST CODE BELOW - SET THE POLYLINE TO MOVE TO THE NEW POSITION
+				trace("Moving the last polyline to this new position.");
+				// Note: The test code adds markers and lines 1-1 and only keeps one marker on map, which is why this works:
+				ExternalInterface.call("floidMapMoveLine__" + mapId + "_" + (nextLineId - 1), latStart , lngStart, lat, lng);
+				// TEST CODE BELOW - change the line to orange:
+				trace("Setting line color to orange:" + (nextLineId - 1));
+				ExternalInterface.call("floidMapSetLineColor_" + mapId + "_" + (nextLineId - 1), 255, 255, 127, 0, 2);
+				// TEST CODE BELOW - check the line to see if its height is ok
+				trace("Checking maxPathElevation:" + (nextLineId - 1));            //                            lineId sl sl  el   el  ms rpdft errft warnft
+				floidMapGetPathMaxElevation((nextLineId - 1), latStart, lngStart, lat, lng, testMaxMarkers, testRequestedDistance, testErrorElevation, testWarningElevation);
+				// TEST CODE BELOW - PRINT OUT THE CURRENT MARKER LIST:
+				trace("Current marker list: " + mapId);
+				for (var markerIdString:String in currentMarkers)
+				{
+					trace("currentMarkers[" + markerIdString + "] = " + currentMarkers[markerIdString] + ";");
+				}
+				// TEST CODE BELOW - PRINT OUT THE CURRENT LINE LIST:
+				trace("Current line list: " + mapId);
+				for (var lineIdString:String in currentLines)
+				{
+					trace("currentLines[" + lineIdString + "] = " + currentLines[lineIdString]);
+				}
+			}
+			// Marker drag:
+			protected function floidMapMarkerDrag(markerId:Number, lat:Number, lng:Number):void
+			{
+				trace("floidMapMarkerDrag: " + markerId + " " + lat + " " + lng);
+			}
+			// Marker elevation result:
+			protected function floidMapMarkerElevationResult(markerId:Number, elevation: Number):void
+			{
+				trace("floidMapMarkerElevationResult: " + markerId + " " + elevation);
+				
+				// TEST CODE BELOW HERE - CHANGE THE ICON NAME TO INCLUDE THE STRING AND RE-SEND THE ICON AND SHADOW:
+				var floidPinAlt:FloidPinAlt = FloidPinAlt(currentMarkers[markerId]);
+				trace("floidMapMarkerElevationResult: " + markerId + " " + elevation + " retrieved marker:");
+				floidPinAlt.pinName = "Floid-"+mapId+"-"+markerId + " [" + int(elevation) + "]";
+				var floidPinMarkerIconBase64String : String = floidPinAlt.makeIcon();
+				trace("Setting marker icon: " + mapId + " " + markerId);
+				trace("marker string: " + floidPinMarkerIconBase64String);
+				ExternalInterface.call("floidMapMarkerSetIconString_" + mapId + "_" + markerId, floidPinMarkerIconBase64String);
+				var floidPinMarkerIconShadowBase64String : String = floidPinAlt.makeIconShadow();
+				trace("Setting marker shadow: " + mapId + " " + markerId);
+				trace("marker shadow string: " + floidPinMarkerIconShadowBase64String);
+			}
+			// Get maximum path elevation:
+			protected function floidMapGetPathMaxElevation(lineId:int, startLat:Number, startLng:Number, endLat:Number, endLng:Number, maxSamples:int, requestedPathDistanceInMeters:Number, errorElevation:Number, warningElevation:Number):void
+			{
+				// Calculate the max actual max number of points:
+				var distanceBetween            : Number = distanceHaversine(startLat, startLng, endLat, endLng);
+				var requiredSamples            : int    = Math.ceil(distanceBetween / requestedPathDistanceInMeters) + 1; // Note that for 10 evenly spaced slots we need 11 points because we always check both start and end
+				var actualSamples              : int    = Math.min(maxSamples, requiredSamples);
+				var actualPathDistanceInMeters : Number = distanceBetween / (actualSamples-1);  // See note above - this is the  opposite part...
+				trace("floidMapGetPathMaxElevation: [" + startLat + ", " + startLng + "] -> [" + endLat + ", " + "]  (" + distanceBetween + "m) samples: max " + maxSamples + " actual " + actualSamples + "  dist: req " + requestedPathDistanceInMeters + " actual: " + actualPathDistanceInMeters + "  level: err " + errorElevation + " warn " + warningElevation);
+				ExternalInterface.call("floidMapGetPathMaxElevation_" + mapId, lineId, startLat, startLng, endLat, endLng, maxSamples, requestedPathDistanceInMeters, errorElevation, warningElevation, actualSamples, actualPathDistanceInMeters);
+			}
+			// Callback for GetPathMaxElevation call:
+			protected function floidMapPathMaxElevationCallBack(lineId:int, startLat:Number, startLng:Number, endLat:Number, endLng:Number, maxSamples:int, requestedPathDistanceInMeters:Number, errorElevation:Number, warningElevation:Number, maxElevation:Number, actualSamples:int, actualPathDistanceInMeters:Number, errorFlag:Boolean):void
+			{
+				trace("floidMapPathMaxElevation Callback: maxElevation " + maxElevation + "  errorFlag " + errorFlag);
+				if(errorFlag)
+				{
+					floidMapSetLineColor(lineId, 255, 255, 70, 255, 2);  // Warning color - magenta
+					trace("Could not check path");
+				}
+				else
+				{
+					if(maxElevation > errorElevation)
+					{
+						// Elevation is at error:
+						floidMapSetLineColor(lineId, 255, 255, 70, 70, 2);  // Error color - red
+						trace("Path Elevation Below Error Elevation: " + maxElevation + "m vs " + errorElevation + "m");
+					}
+					else if(maxElevation > warningElevation)
+					{
+						// Elevation was good - how did we check:
+						if(actualPathDistanceInMeters > requestedPathDistanceInMeters)
+						{
+							// Do not have enough info - warning
+							floidMapSetLineColor(lineId, 255, 255, 200, 128, 2);  // Warning color - red-yellow
+							trace("Path was at warning but not checked to desired distance: " + actualPathDistanceInMeters + "m vs " + requestedPathDistanceInMeters + "m");
+						}
+						else
+						{
+							// Elevation is at warning:
+							floidMapSetLineColor(lineId, 255, 255, 255, 70, 2);  // Warning color - yellow
+							trace("Path Elevation Below Warning Elevation: " + maxElevation + "m vs " + warningElevation + "m");
+						}
+					}
+					else
+					{
+						// Elevation was good - how did we check:
+						if(actualPathDistanceInMeters > requestedPathDistanceInMeters)
+						{
+							// Do not have enough info - warning
+							floidMapSetLineColor(lineId, 255, 200, 255, 128, 2);  // Warning color - yellow - green
+							trace("Path was good but not checked to desired distance: " + actualPathDistanceInMeters + "m vs " + requestedPathDistanceInMeters + "m");
+						}
+						else
+						{
+							// All was good...
+							floidMapSetLineColor(lineId, 255, 70, 255, 70, 2);  // Good color - green
+							trace("Elevation was good!");
+						}
+					}
+				}            
+				// Put stuff here, like removing this from a list of path items we are waiting for to have a full mission check complete
+				// Note some elevation apis as implemented in $.getJSON fail silently and should be redone using $.ajax
+				trace("mapQuestMapsPathMaxElevation Callback complete");
+			}
+			protected function floidMapSetLineColor(lineId:Number, a:int, r:int, g:int, b:int, w:int):void
+			{
+				ExternalInterface.call("floidMapSetLineColor_" + mapId + "_" + lineId, a, r, g, b, w);
+			}
+		]]>
+	</fx:Script>
+</s:Group>

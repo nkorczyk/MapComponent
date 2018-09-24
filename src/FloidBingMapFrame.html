@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+    <html>
+      <head>
+        <!-- faigelabs - test code for Floid maps - cfaigle - free -->
+        <meta  name="viewport"
+               content="initial-scale=1.0, user-scalable=no" />
+        <style type="text/css">
+          html { height: 100% }
+          body { height: 100%; margin: 0; padding: 0 }
+          #map_canvas { height: 100% }
+        </style>
+        <script type ="text/javascript"
+                src  ="FloidMapUtilities.js">
+        </script>
+        <script type ="text/javascript"
+                src  ="jquery-1.9.1.min.js">
+        </script>
+        <script type ="text/javascript"
+                src  ="http://ecn.dev.virtualearth.net/mapcontrol/mapcontrol.ashx?v=7.0">
+        </script>
+        <script type="text/javascript">
+            ///////////////////////////////////////////
+            ///////////////////////////////////////////
+            // Main Initialize - Magic starts here:  //
+            ///////////////////////////////////////////
+            ///////////////////////////////////////////
+            function initialize()
+            {
+                //------------------------------------------------------------------------------------//
+                // We need to keep track of the map listeners so we can turn them on/off in routines  //
+                //------------------------------------------------------------------------------------//
+                var mapDoubleClickListener     = null;
+                //----------------------------------//
+                // Create the default map options:  //
+                //----------------------------------//
+                var mapOptions =  {
+                                      credentials: "YOUR_API_KEY",
+                                      center: new Microsoft.Maps.Location(latStart, lngStart),
+                                      mapTypeId: Microsoft.Maps.MapTypeId.road,
+                                      zoom: 12
+                                  };
+                //---------------------------------------//
+                // Create the map:                       //
+                //---------------------------------------//
+                var map = new Microsoft.Maps.Map(document.getElementById("map_canvas"), mapOptions);
+                //----------------------------------------------//
+                // By default we add the double click listener: //
+                //----------------------------------------------//
+                addDoubleClickListener();
+                //-------------------------------------------------------//
+                // Make add and remove map double click event listeners: //
+                //-------------------------------------------------------//
+                function addDoubleClickListener()
+                {
+                    log("Adding map double click listener: " + mapId);
+                    // Remove previous
+                    if(mapDoubleClickListener != null)
+                    {
+                        Microsoft.Maps.Events.removeHandler(mapDoubleClickListener);
+                        mapDoubleClickListener = null;
+                    }
+                    // Add new:
+                    try
+                    {
+                        mapDoubleClickListener = Microsoft.Maps.Events.addHandler(map,
+                                                                                  'dblclick',
+                                                                                  function(event)
+                                                                                  {
+                                                                                      if(event.target==map)
+                                                                                      {                                                                                  
+                                                                                          var point     = new Microsoft.Maps.Point(event.getX(), event.getY());
+                                                                                          var loc       = event.target.tryPixelToLocation(point);
+                                                                                          mapDoubleClick(loc);
+                                                                                          event.handled = true;
+                                                                                      }
+                                                                                  });
+                    }
+                    catch(err)
+                    {
+                        log("addDoubleClickListener: " + err);
+                        mapDoubleClickListener = null;
+                    }
+                }
+                function removeDoubleClickListener()
+                {
+                    log("Removing map double click listener: " + mapId);
+                    // Remove previous
+                    if(mapDoubleClickListener != null)
+                    {
+                        Microsoft.Maps.Events.removeHandler(mapDoubleClickListener);
+                        mapDoubleClickListener = null;
+                    }
+                    // Add new:
+                    try
+                    {
+                        mapDoubleClickListener = Microsoft.Maps.Events.addHandler(map,
+                                                                                  'dblclick',
+                                                                                  function(event)
+                                                                                  {
+                                                                                      if(event.target==map)
+                                                                                      {
+                                                                                          event.handled = true;
+                                                                                      }
+                                                                                  });
+                    }
+                    catch(err)
+                    {
+                        log("removeDoubleClickListener: " + err);
+                        mapDoubleClickListener = null;
+                    }
+                }
+                //------------------------------------------//
+                // Create handlers for map double click:    //
+                //------------------------------------------//
+                // mapDoubleClick:
+                function mapDoubleClick(latLng)
+                {
+                    log("mapDoubleClick: " + latLng);
+                    log("calling flash routine: " + "floidMapDoubleClick_" + mapId);
+                    swfObject["floidMapDoubleClick_" + mapId](latLng.latitude, latLng.longitude);
+                }
+                //********************************//
+                //********************************//
+                // Calls from Flash to the map:   //
+                //********************************//
+                //********************************//
+                ////////////////////////////////////////////////
+                // Function creators for flash calls to map:  //
+                ////////////////////////////////////////////////
+                // -----------------------------
+                // floidBingMapsCreateNewMarker:
+                // -----------------------------
+                function makeFloidBingMapsCreateNewMarkerFunction()
+                {
+                    return function(lat, lng, markerId)
+                    {
+                        log("floidBingMapsCreateNewMarker: " + lat + " " + lng + " " + markerId);
+                        createNewMarker(lat, lng, markerId);
+                    } 
+                }
+                // ---------------------------
+                // floidBingMapsCreateNewLine:
+                // ---------------------------
+                function makeFloidBingMapsCreateNewLineFunction()
+                {
+                    return function(lineId, startLat, startLng, endLat, endLng, a, r, g, b, w)
+                    {
+                        log("floidBingMapsCreateNewLine: " + startLat + " " + startLng + " " + endLat + " " + endLng + " " + a + " " + r + " " + g + " " + b);
+                        createNewLine(lineId, startLat, startLng, endLat, endLng, a, r, g, b, w);
+                    } 
+                }
+                // ------------------------------------
+                // floidBingMapsAddDoubleClickListener:
+                // ------------------------------------
+                function makeFloidBingMapsAddDoubleClickListenerFunction()
+                {
+                    return function(mapId)
+                    {
+                        log("floidBingMapsAddDoubleClickListener: " + mapId);
+                        addDoubleClickListener();
+                    } 
+                }
+                // ---------------------------------------
+                // floidBingMapsRemoveDoubleClickListener:
+                // ---------------------------------------
+                function makeFloidBingMapsRemoveDoubleClickListenerFunction()
+                {
+                    return function(mapId)
+                    {
+                        log("floidBingMapsRemoveDoubleClickListener: " + mapId);
+                        removeDoubleClickListener();
+                    } 
+                }
+                // ----------------------------------
+                // floidBingMapsGetPathMaxElevation:
+                // ----------------------------------
+                function makeFloidBingMapsGetPathMaxElevationFunction()
+                {
+                    return function(lineId, startLat, startLng, endLat, endLng, maxMarkers, requestedPathDistanceInMeters, errorElevation, warningElevation, actualMarkers, actualPathDistanceInMeters)
+                    {
+                        log("floidBingMapsGetPathMaxElevation: " + startLat + " " + startLng + " " + endLat + " " + endLng + " " + maxMarkers + " " + requestedPathDistanceInMeters + " " + errorElevation + " " + warningElevation + " " + actualMarkers + " " + actualPathDistanceInMeters);
+                        getPathMaxElevation(lineId, startLat, startLng, endLat, endLng, maxMarkers, requestedPathDistanceInMeters, errorElevation, warningElevation, actualMarkers, actualPathDistanceInMeters);
+                    } 
+                }
+                //////////////////////////////////////////////////////////////////////////////
+                // Make a set of function creation routines for the flash calls to the DOM: //
+                //////////////////////////////////////////////////////////////////////////////
+                // -----------------------------
+                // floidBingMapsCreateNewMarker:
+                // -----------------------------
+                var floidBingMapsCreateNewMarkerFunctionName                       = "floidMapCreateNewMarker_" + mapId;
+                this.parent[floidBingMapsCreateNewMarkerFunctionName]              = makeFloidBingMapsCreateNewMarkerFunction();
+                // ---------------------------
+                // floidBingMapsCreateNewLine:
+                // ---------------------------
+                var floidBingMapsCreateNewLineFunctionName                         = "floidMapCreateNewLine_" + mapId;
+                this.parent[floidBingMapsCreateNewLineFunctionName]                = makeFloidBingMapsCreateNewLineFunction();
+                // ------------------------------------
+                // floidBingMapsAddDoubleClickListener:
+                // ------------------------------------
+                var floidBingMapsAddDoubleClickListenerFunctionName                = "floidMapAddDoubleClickListener_" + mapId;
+                this.parent[floidBingMapsAddDoubleClickListenerFunctionName]       = makeFloidBingMapsAddDoubleClickListenerFunction();
+                // ---------------------------------------
+                // floidBingMapsRemoveDoubleClickListener:
+                // ---------------------------------------
+                var floidBingMapsRemoveDoubleClickListenerFunctionName             = "floidMapRemoveDoubleClickListener_" + mapId;
+                this.parent[floidBingMapsRemoveDoubleClickListenerFunctionName]    = makeFloidBingMapsRemoveDoubleClickListenerFunction();
+                // --------------------------------
+                // floidBingMapsGetPathMaxElevation:
+                // --------------------------------
+                var floidBingMapsGetPathMaxElevationFunctionName                   = "floidMapGetPathMaxElevation_" + mapId;
+                this.parent[floidBingMapsGetPathMaxElevationFunctionName]          = makeFloidBingMapsGetPathMaxElevationFunction();
+                /////////////////////////////
+                // Map routines:           //
+                /////////////////////////////
+                var clickable                 = true;
+                // ----- MARKERS -----
+                // ----------------
+                // createNewMarker:
+                // ----------------
+                function createNewMarker(lat, lng, markerId)
+                {
+                    log("Making new marker [" + mapId + "] ("+lat + ", " + lng + ")");
+                    var markerOptions = {
+                                           draggable: true
+                                        };
+                    var marker        = new Microsoft.Maps.Pushpin(new Microsoft.Maps.Location(lat, lng), markerOptions); 
+                    var dragStarted   = false;
+                    var dragged       = false;
+                    map.entities.push(marker);
+                    ////////////////////////////////////////////////
+                    // Marker listeners that call back to flash:  //
+                    ////////////////////////////////////////////////
+                    // ------------------------------------------------------
+                    // OK, here we want to add the listeners for this marker:
+                    // ------------------------------------------------------
+                    Microsoft.Maps.Events.addHandler( marker,
+                                                      'dblclick',
+                                                      function(event)
+                                                      {
+                                                          log("*************** MARKER DOUBLE CLICK ************");
+                                                          dragStarted   = false;
+                                                          dragged       = false;
+                                                          if(clickable)
+                                                          {
+                                                              swfObject["floidMapMarkerDoubleClick_" + mapId+"_"+markerId](markerId);            
+                                                          }
+                                                          event.handled = true;
+                                                      });
+                    Microsoft.Maps.Events.addHandler( marker,
+                                                     'dragstart',
+                                                     function(event)
+                                                     {
+                                                        dragStarted   = true;
+                                                        dragged       = false;
+                                                     });
+                    Microsoft.Maps.Events.addHandler( marker,
+                                                      'dragend',
+                                                      function(event)
+                                                      {
+                                                          if(dragged)
+                                                          {
+                                                             swfObject["floidMapMarkerDragEnd_"  + mapId+"_"+markerId](markerId, event.entity.getLocation().latitude,  event.entity.getLocation().longitude);
+                                                          }
+                                                          dragStarted   = false;
+                                                          dragged       = false;
+                                                      });
+                    Microsoft.Maps.Events.addHandler( marker,
+                                                      'drag',
+                                                      function(event)
+                                                      {
+                                                          if(dragStarted)
+                                                          {
+                                                             dragStarted = false;
+                                                             dragged     = true;
+                                                             swfObject["floidMapMarkerDragStart_" + mapId+"_"+markerId](markerId, event.entity.getLocation().latitude,  event.entity.getLocation().longitude);
+                                                          }
+                                                          swfObject["floidMapMarkerDrag_"     + mapId+"_"+markerId](markerId, event.entity.getLocation().latitude, event.entity.getLocation().longitude);
+                                                      });
+                    //***********************************//
+                    //***********************************//
+                    // Calls from Flash to the marker:   //
+                    //***********************************//
+                    //***********************************//
+                    ///////////////////////////////////////////////////
+                    // Function creators for flash calls to marker:    //
+                    ///////////////////////////////////////////////////
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetClickable: [function creator]
+                    // -----------------------------------------------------
+                    function makeFloidBingMapsMarkerSetClickableFunction(marker, markerId)
+                    {
+                        return function(isClickable)
+                        {
+                            clickable = isClickable;
+                        }
+                    }
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetDraggable: [function creator]
+                    // -----------------------------------------------------
+                    function makeFloidBingMapsMarkerSetDraggableFunction(marker, markerId)
+                    {
+                        return function(draggable)
+                        {
+                                log("floidBingMapsMarkerSettingDraggable: " + markerId + "  to " + draggable);
+                                marker.setOptions({draggable: draggable});
+                        }
+                    }
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetIconString: [function creator]
+                    // -----------------------------------------------------
+                    function makeFloidBingMapsMarkerSetIconStringFunction(marker, markerId)
+                    {
+                        return function(iconString)
+                        {
+                                log("floidBingMapsMarkerSetIconString: " + markerId);
+                                log("marker icon string: " + iconString);
+                                var markerIcon = {icon:    'data:image/png;base64,'+iconString,
+                                                  height:  38,
+                                                  width:   100,
+                                                  anchor:  new Microsoft.Maps.Point(0,38)
+                                                 };
+                                log("floidBingMapsMarkerSetIconString: " + markerId + " - markerIconMade");
+                                marker.setOptions(markerIcon);
+                                log("floidBingMapsMarkerSetIconString: " + markerId + " - markerIconSet");
+                        }
+                    }
+                    // ------------------------------------------------------------
+                    // floidBingMapsMarkerSetIconShadowString: [function creator]
+                    // ------------------------------------------------------------
+                    function makeFloidBingMapsMarkerSetIconShadowStringFunction(marker, markerId)
+                    {
+                        return function(iconShadowString)
+                        {
+                            log("floidBingMapsMarkerSetIconShadowString: " + markerId);
+                            log("marker shadow string: [NOT SUPPORTED BY BING?]" + iconShadowString);
+                        }
+                    }
+                    // ---------------------------------------------------------
+                    // floidBingMapsMarkerRequestElevation: [function creator]
+                    // ---------------------------------------------------------
+                    function makeFloidBingMapsMarkerRequestElevationFunction(marker, markerId)
+                    {
+                        return function(markerId, lat, lng)
+                        {
+                            log("floidBingMapsMarkerRequestElevation: " + markerId + " - Requesting Elevation for: " + lat + " " + lng);
+                            // Locations parameter:
+                            var bingElevationUrl = "http://dev.virtualearth.net/REST/v1/Elevation/List?points="+lat+","+lng+"&key=YOUR_API_KEY&jsonp=?";
+                            $.getJSON(bingElevationUrl, function(data) {
+                                                                          log("requestElevationFunction: " + data );
+                                                                  if(    (data != null)
+                                                                      && (data.resourceSets != null)
+                                                                      && (data.resourceSets.length >0)
+                                                                      && (data.resourceSets[0].resources != null)
+                                                                      && (data.resourceSets[0].resources.length >0)
+                                                                      && (data.resourceSets[0].resources[0] != null)
+                                                                      && (data.resourceSets[0].resources[0].elevations != null)
+                                                                      && (data.resourceSets[0].resources[0].elevations.length >0) )
+                                                                          {
+                                                                              var elevation = data.resourceSets[0].resources[0].elevations[0];
+                                                                              log("Elevation of point: " + elevation);
+                                                                              // call back into flash :)
+                                                                              swfObject["floidMapMarkerElevationResult_" + mapId+"_"+markerId](markerId, elevation);
+                                                                              log("elevation callback done:");
+                                                                          }
+                                                                          else
+                                                                          {
+                                                                              log("Error in requestElevationFunction results");
+                                                                          }
+                                                                       });
+                            log("floidBingMapsMarkerRequestElevation: " + markerId + " - Elevation Requested");
+                        }
+                    }
+                    // ---------------------------------------------
+                    // floidBingMapsRemoveMarker: [function creator]
+                    // ---------------------------------------------
+                    function makeFloidBingMapsRemoveMarkerFunction(marker, markerId)
+                    {
+                        return function()
+                        {
+                            log("floidBingMapsRemoveMarker: " + mapId + " "  + markerId);
+                            try
+                            {
+                                // Remove the marker:
+                                map.entities.remove(marker);
+                                marker = null;
+                                // Remove the globally bound functions:
+                                delete this.parent[floidBingMapsMarkerSetClickableFunctionName];
+                                delete this.parent[floidBingMapsMarkerSetDraggableFunctionName];
+                                delete this.parent[floidBingMapsMarkerRequestElevationFunctionName];
+                                delete this.parent[floidBingMapsMarkerSetIconStringFunctionName];
+                                delete this.parent[floidBingMapsMarkerSetIconShadowStringFunctionName];
+                                // Don't forget me!
+                                delete this.parent[floidBingMapsRemoveMarkerFunctionName];
+                            }
+                            catch(err)
+                            {
+                                log("floidBingMapsRemoveMarker: error " + mapId + " "  + markerId + " " + err);
+                            }
+                            log("Done removing marker.");
+                        }
+                    }
+                    ///////////////////////////////////////////////////////
+                    // Add the flash calls for this marker to the DOM:   //
+                    ///////////////////////////////////////////////////////    
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetClickable:
+                    // -----------------------------------------------------
+                    var floidBingMapsMarkerSetClickableFunctionName                 = "floidMapMarkerSetClickable_" + mapId + "_" + markerId;
+                    this.parent[floidBingMapsMarkerSetClickableFunctionName]        = makeFloidBingMapsMarkerSetClickableFunction(marker, markerId);    
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetDraggable:
+                    // -----------------------------------------------------
+                    var floidBingMapsMarkerSetDraggableFunctionName                 = "floidMapMarkerSetDraggable_" + mapId + "_" + markerId;
+                    this.parent[floidBingMapsMarkerSetDraggableFunctionName]        = makeFloidBingMapsMarkerSetDraggableFunction(marker, markerId);
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerRequestElevation:
+                    // -----------------------------------------------------
+                    var floidBingMapsMarkerRequestElevationFunctionName             = "floidMapMarkerRequestElevation_" + mapId + "_" + markerId;
+                    this.parent[floidBingMapsMarkerRequestElevationFunctionName]    = makeFloidBingMapsMarkerRequestElevationFunction(marker, markerId);
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetIconString:
+                    // -----------------------------------------------------
+                    var floidBingMapsMarkerSetIconStringFunctionName                = "floidMapMarkerSetIconString_" + mapId + "_" + markerId;
+                    this.parent[floidBingMapsMarkerSetIconStringFunctionName]       = makeFloidBingMapsMarkerSetIconStringFunction(marker, markerId);
+                    // -----------------------------------------------------
+                    // floidBingMapsMarkerSetIconShadowString:
+                    // -----------------------------------------------------
+                    var floidBingMapsMarkerSetIconShadowStringFunctionName          = "floidMapMarkerSetIconShadowString_" + mapId + "_" + markerId;
+                    this.parent[floidBingMapsMarkerSetIconShadowStringFunctionName] = makeFloidBingMapsMarkerSetIconShadowStringFunction(marker, markerId);
+                    // ----------------------------
+                    // floidBingMapsRemoveMarker:
+                    // ----------------------------
+                    var floidBingMapsRemoveMarkerFunctionName                       = "floidMapRemoveMarker_" + mapId + "_" + markerId;
+                    this.parent[floidBingMapsRemoveMarkerFunctionName]              = makeFloidBingMapsRemoveMarkerFunction(marker, markerId);
+    
+                }
+                // ----- LINES -----
+                // -----------------
+                // createNewLine:
+                // -----------------
+                function createNewLine(lineId, startLat, startLng, endLat, endLng, a, r, g, b, w)
+                {
+                    var options  = {  strokeColor     : new Microsoft.Maps.Color(a, r, g, b),
+                                      strokeThickness : 1 }; 
+                    var line = new Microsoft.Maps.Polyline( [ new Microsoft.Maps.Location(startLat, startLng),
+                                                              new Microsoft.Maps.Location(endLat,   endLng)
+                                                            ],
+                                                            options
+                                                          );
+                    map.entities.push(line);
+                    //////////////////////////////////////////////
+                    // Line listeners that call back to flash:  //
+                    //////////////////////////////////////////////
+                    // ----------------------------------------------------
+                    // OK, here we want to add the listeners for this line:
+                    // ----------------------------------------------------
+                    // Default is no listeners for this line:
+                    //***********************************//
+                    //***********************************//
+                    // Calls from Flash to the line:     //
+                    //***********************************//
+                    //***********************************//
+                    /////////////////////////////////////////////////
+                    // Function creators for flash calls to line:  //
+                    /////////////////////////////////////////////////
+                    // -----------------------------------------------
+                    // floidBingMapsRemoveLine: [function creator]
+                    // -----------------------------------------------
+                    function makeFloidBingMapsRemoveLineFunction(line, lineId)
+                    {
+                        return function()
+                        {
+                            log("Removing line.");
+                            try
+                            {
+                                // Remove the line:
+                                map.entities.remove(line);
+                                line = null;
+                                // Remove the globally bound functions:
+                                // - empty
+                                // Don't forget me!
+                                delete this.parent[floidBingMapsRemoveLineFunctionName];
+                            }
+                            catch(err)
+                            {
+                                log("floidBingMapsRemoveMarker: error " + err);
+                            }
+                            log("Done removing line.");
+                        }
+                    }
+                    // -----------------------------------------------
+                    // floidBingMapsSetLineColor: [function creator]
+                    // -----------------------------------------------
+                    function makeFloidBingMapsSetLineColorFunction(line, lineId)
+                    {
+                        return function(a, r, g, b, w)
+                        {
+                            log("Changing line color.");
+                            try
+                            {
+                                var strokeOptions  = {  strokeColor: new Microsoft.Maps.Color(a, r, g, b), strokeThickness:w};
+                                line.setOptions(strokeOptions);
+                            }
+                            catch(err)
+                            {
+                                log("floidBingMapsSetLineColor: error " + err);
+                            }
+                            log("Done setting line color.");
+                        }
+                    }
+                    // -----------------------------------------
+                    // floidBingMapsMoveLine: [function creator]
+                    // -----------------------------------------
+                    function makeFloidBingMapsMoveLineFunction(line, lineId)
+                    {
+                        return function(startLat, startLng, endLat, endLng)
+                        {
+                            log("Moving line [" + lineId + "] to: " + startLat + " " + startLng + " -> " + endLat + " " + endLng);
+                            try
+                            {
+                                line.setLocations( [ new Microsoft.Maps.Location(startLat, startLng),
+                                                     new Microsoft.Maps.Location(endLat,   endLng)
+                                                   ]);
+                            }
+                            catch(err)
+                            {
+                                log("floidBingMapsMoveLine: error " + err);
+                            }
+                            log("Done moving line.");
+                        }
+                    }
+                    /////////////////////////////////////////////////////
+                    // Add the flash calls for this line to the DOM:   //
+                    /////////////////////////////////////////////////////
+                    // -----------------------------------------------------
+                    // floidBingMapsRemoveLineFunction:
+                    // -----------------------------------------------------
+                    var floidBingMapsRemoveLineFunctionName                    = "floidMapRemoveLine_" + mapId + "_" + lineId;
+                    this.parent[floidBingMapsRemoveLineFunctionName]           = makeFloidBingMapsRemoveLineFunction(line, lineId);    
+                    // -----------------------------------------------------
+                    // floidBingMapsSetLineColorFunction:
+                    // -----------------------------------------------------
+                    var floidBingMapsSetLineColorFunctionName                  = "floidMapSetLineColor_" + mapId + "_" + lineId;
+                    this.parent[floidBingMapsSetLineColorFunctionName]         = makeFloidBingMapsSetLineColorFunction(line, lineId);    
+                    // -----------------------------------------------------
+                    // floidBingMapsMoveLineFunction:
+                    // -----------------------------------------------------
+                    var floidBingMapsMoveLineFunctionName                      = "floidMapMoveLine__" + mapId + "_" + lineId;
+                    this.parent[floidBingMapsMoveLineFunctionName]             = makeFloidBingMapsMoveLineFunction(line, lineId);    
+                }
+                // ------ Paths -------
+                // --------------------
+                // getPathMaxElevation:
+                // --------------------
+                function getPathMaxElevation(lineId, startLat, startLng, endLat, endLng, maxSamples, requestedPathDistanceInMeters, errorElevation, warningElevation, actualSamples, actualPathDistanceInMeters)
+                {
+                    var sampleLocations = calculateSamples(startLat, startLng, endLat, endLng, actualSamples);
+                    var sampleLatLngPointsString = "";
+                    var firstLocation = true;
+                    for(var i=0; i<sampleLocations.length; ++i)
+                    {
+                        if(firstLocation)
+                        {
+                            firstLocation = false;
+                        }
+                        else
+                        {
+                            sampleLatLngPointsString = sampleLatLngPointsString + ", ";
+                        }
+                        sampleLatLngPointsString = sampleLatLngPointsString + sampleLocations[i];
+                    }
+                    var bingElevationUrl = "http://dev.virtualearth.net/REST/v1/Elevation/List?points="+sampleLatLngPointsString+"&key=YOU_API_KEY&jsonp=?";
+                    // TODO Add a timer here since this can fail silently or use jQuery $.ajax instead:
+                    $.getJSON(bingElevationUrl, function(data) {
+                                                                  log( data );
+                                                                  var errorFlag    = true;
+                                                                  var maxElevation = -100000; // Min value
+                                                                  if(    (data != null)
+                                                                      && (data.resourceSets != null)
+                                                                      && (data.resourceSets.length >0)
+                                                                      && (data.resourceSets[0].resources != null)
+                                                                      && (data.resourceSets[0].resources.length >0)
+                                                                      && (data.resourceSets[0].resources[0] != null)
+                                                                      && (data.resourceSets[0].resources[0].elevations != null)
+                                                                      && (data.resourceSets[0].resources[0].elevations.length >0) )
+                                                                  {
+                                                                      maxElevation = data.resourceSets[0].resources[0].elevations[0];
+                                                                      errorFlag  = false;
+                                                                      for(var i=0; i<data.resourceSets[0].resources[0].elevations.length; ++i)
+                                                                      {
+                                                                          var sampleElevation = data.resourceSets[0].resources[0].elevations[i];
+                                                                          if(sampleElevation > maxElevation) maxElevation = sampleElevation;
+                                                                      }
+                                                                      log("Max elevation of path: " + maxElevation);
+                                                                      // call back into flash :)
+                                                                      swfObject["floidMapPathMaxElevationCallBack_" + mapId](lineId, startLat, startLng, endLat, endLng, maxSamples, requestedPathDistanceInMeters, errorElevation, warningElevation, maxElevation, actualSamples, actualPathDistanceInMeters, errorFlag);
+                                                                      log("elevation callback done:");
+                                                                  }
+                                                                  else
+                                                                  {
+                                                                      swfObject["floidMapPathMaxElevationCallBack_" + mapId](lineId, startLat, startLng, endLat, endLng, maxSamples, requestedPathDistanceInMeters, errorElevation, warningElevation, maxElevation, actualSamples, actualPathDistanceInMeters, errorFlag);
+                                                                      log("Error in getPathMaxElevation results");
+                                                                  }
+                                                               });
+                    log("getMaxPathElevation: " + lineId + " - Elevation Requested");
+                }            
+                // OK, the map is fully initialized - call back into flash:
+                swfObject["floidMapInitialized_" + mapId]();
+            }
+            function finalize()
+            {
+                // Remove global map functions - TODO: remove remaining marker & line functions
+                try
+                {
+                    delete this.parent[floidBingMapsCreateNewMarkerFunctionName];
+                    delete this.parent[floidBingMapsCreateNewLineFunctionName];
+                    delete this.parent[floidBingMapsAddDoubleClickListenerFunctionName];
+                    delete this.parent[floidBingMapsRemoveDoubleClickListenerFunctionName];
+                    delete this.parent[floidBingMapsGetPathMaxElevationFunctionName];
+                }
+                catch(err)
+                {
+                    log("Removing map methods error: " + err);
+                }
+                if(swfObject != null)
+                {
+                    // call back into flash :)
+                    swfObject["floidMapFrameUnloaded_" + mapId]();
+                }
+            }
+        </script>
+      </head>
+      <body onload="initialize()" onunload="finalize()">
+        <div id="map_canvas" style="width:100%; height:100%"></div>
+      </body>
+    </html>

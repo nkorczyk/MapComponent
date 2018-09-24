@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- faigelabs - test code for Floid maps - cfaigle - free -->
+<s:Application xmlns:fx         = "http://ns.adobe.com/mxml/2009"
+	xmlns:s          = "library://ns.adobe.com/flex/spark"
+	xmlns:mx         = "library://ns.adobe.com/flex/mx"
+	xmlns:flexiframe = "http://code.google.com/p/flex-iframe/"
+	minWidth         = "955"
+	minHeight        = "600"
+	creationComplete = "creationCompleteHandler(event)"
+	xmlns:local      = "*"
+	xmlns:maps       = "com.faiglelabs.floid.maps.*"
+	backgroundColor="#7D98A6">
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				// Put stuff here to do when application is created...
+			}
+		]]>
+	</fx:Script>
+	<s:layout>
+		<s:VerticalLayout horizontalAlign="center" verticalAlign="middle"/>
+	</s:layout>
+	<s:VGroup>
+		<s:TabBar dataProvider="{views}"/>
+		<mx:ViewStack id="views">
+			<s:NavigatorContent id="search1" label="Search1">
+				<s:VGroup>
+					<s:TextArea fontSize="14" width="400" height="24" borderVisible="false" text="Google"/>
+					<maps:FloidGoogleMap   id="floidGoogleMap_1" mapId="112299" height="400" width="400" latStart="50.0134353" lngStart="19.9915373" 
+						testMaxMarkers="1000"/>
+					<s:Label text="Lokalizacja Firmy"/>
+				</s:VGroup>
+			</s:NavigatorContent>
+			<s:NavigatorContent id="search2" label="Search2">
+				<s:BorderContainer width="100%" height="100%" backgroundColor="#00FF00"/>
+			</s:NavigatorContent>
+			<s:NavigatorContent id="search3" label="Search3">
+				<s:BorderContainer width="100%" height="100%" backgroundColor="#FF0000"/>				
+			</s:NavigatorContent>
+		</mx:ViewStack>
+		<!--<s:VGroup>
+		<s:TextArea fontSize="14" width="400" height="24" borderVisible="false" text="MapQuest"/>
+		<maps:FloidMapQuestMap id="floidMapQuestMap_2"  mapId="2" height="400" width="400" latStart="39.885522" lngStart="3.096644"/>
+		</s:VGroup>
+		<s:VGroup>
+		<s:TextArea fontSize="14" width="400" height="24" borderVisible="false" text="Bing"/>
+		<maps:FloidBingMap id="floidBingMap_3"  mapId="3" height="400" width="400" latStart="39.885522" lngStart="3.096644"/>
+		</s:VGroup>-->
+	</s:VGroup>
+	<!--<s:HGroup>
+	<s:VGroup>
+	<s:TextArea fontSize="14" width="400" height="24" borderVisible="false" text="Google"/>
+	<maps:FloidGoogleMap   id="floidGoogleMap_4" mapId="4" height="400" width="400" latStart="39.885522" lngStart="3.096644"/>
+	</s:VGroup>
+	<s:VGroup>
+	<s:TextArea fontSize="14" width="400" height="24" borderVisible="false" text="MapQuest"/>
+	<maps:FloidMapQuestMap id="floidMapQuestMap_5"  mapId="5" height="400" width="400" latStart="39.885522" lngStart="3.096644"/>
+	</s:VGroup>
+	<s:VGroup>
+	<s:TextArea fontSize="14" width="400" height="24" borderVisible="false" text="Bing"/>
+	<maps:FloidBingMap id="floidBingMap_6"  mapId="6" height="400" width="400" latStart="39.885522" lngStart="3.096644"/>
+	</s:VGroup>
+	</s:HGroup>-->
+</s:Application>
